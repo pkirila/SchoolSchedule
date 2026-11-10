@@ -1,0 +1,485 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#1d4fd8">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Mod Day">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<title>Mod Day Planner</title>
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icons/icon-192.png" type="image/png">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,800&family=Atkinson+Hyperlegible:wght@400;700&family=IBM+Plex+Mono:wght@500&display=swap">
+<style>
+[hidden]{display:none!important}
+html{color-scheme:light}
+:root{padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+body{margin:0}
+/* Layout: one narrow planner column — date strip, day header, then a time-ruled list of mods. Tabs swap Today / My classes / Calendar. */
+:root{
+  --bg:#e8ecee; --paper:#f7f9fa; --ink:#18232b; --muted:#5b6a74; --rule:#cdd5da;
+  --accent:#1d4fd8; --accent-ink:#ffffff; --now:#fff3c4; --now-edge:#d99a00; --act:#e3ebff; --ok:#17794a; --warn:#a14b00;
+  --f-display:"Bricolage Grotesque", "Avenir Next", system-ui, sans-serif;
+  --f-body:"Atkinson Hyperlegible", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --f-mono:"IBM Plex Mono", ui-monospace, "SF Mono", Menlo, monospace;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+  --bg:#11171b; --paper:#19222829; --paper:#192228; --ink:#e6edf1; --muted:#93a3ad; --rule:#2c3840;
+  --accent:#7ea2ff; --accent-ink:#0d1420; --now:#3a2f0c; --now-edge:#f0b52a; --act:#1c2a4a; --ok:#5bd394; --warn:#ffad66; color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#11171b; --paper:#192228; --ink:#e6edf1; --muted:#93a3ad; --rule:#2c3840;
+  --accent:#7ea2ff; --accent-ink:#0d1420; --now:#3a2f0c; --now-edge:#f0b52a; --act:#1c2a4a; --ok:#5bd394; --warn:#ffad66; color-scheme:dark}
+*{box-sizing:border-box}
+body{background:var(--bg);color:var(--ink);font-family:var(--f-body);font-size:16px;line-height:1.45;
+  padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));padding-block:20px 48px}
+.wrap{max-width:720px;margin:0 auto;display:flex;flex-direction:column;gap:18px}
+h1,h2,h3{font-family:var(--f-display);margin:0;text-wrap:balance}
+button,input,select,textarea{font:inherit;color:inherit}
+button{cursor:pointer}
+:focus-visible{outline:3px solid var(--accent);outline-offset:2px}
+.mono{font-family:var(--f-mono);font-variant-numeric:tabular-nums}
+.muted{color:var(--muted)}
+.small{font-size:13px}
+
+header.top{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap}
+.brand{font-family:var(--f-display);font-weight:800;font-size:22px;letter-spacing:-.01em}
+.tabs{display:flex;gap:4px;background:var(--paper);border:1px solid var(--rule);border-radius:10px;padding:3px}
+.tabs button{border:0;background:none;padding:7px 12px;border-radius:7px;font-weight:700;font-size:14px;color:var(--muted)}
+.tabs button[aria-selected="true"]{background:var(--ink);color:var(--bg)}
+
+.datebar{display:flex;align-items:center;gap:8px}
+.datebar .lbl{flex:1;text-align:center;font-weight:700}
+.iconbtn{border:1px solid var(--rule);background:var(--paper);border-radius:8px;width:38px;height:38px;font-size:18px;line-height:1}
+.linkbtn{border:0;background:none;color:var(--accent);font-weight:700;padding:4px 6px}
+
+.dayhead{display:flex;gap:16px;align-items:center;flex-wrap:wrap}
+.letter{font-family:var(--f-display);font-weight:800;font-size:64px;line-height:.9;width:84px;height:84px;display:grid;place-items:center;
+  background:var(--accent);color:var(--accent-ink);border-radius:14px}
+.letter.none{background:var(--rule);color:var(--muted);font-size:40px}
+.dayinfo{flex:1;min-width:0;display:flex;flex-direction:column;gap:4px}
+.dayinfo h2{font-size:26px}
+.chip{display:inline-flex;align-items:center;gap:6px;font-size:13px;font-weight:700;padding:3px 9px;border-radius:999px;border:1px solid var(--rule);background:var(--paper);width:max-content;max-width:100%}
+.chip.src-cal{color:var(--ok)} .chip.src-man{color:var(--warn)}
+.override{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+select,input[type=text],input[type=url],textarea{background:var(--paper);border:1px solid var(--rule);border-radius:8px;padding:8px 10px;min-width:0}
+
+.now{background:var(--now);border:1px solid var(--now-edge);border-radius:12px;padding:12px 14px;display:flex;flex-direction:column;gap:6px}
+.now .big{font-family:var(--f-display);font-weight:800;font-size:22px}
+.bar{height:6px;background:color-mix(in srgb,var(--now-edge) 25%,transparent);border-radius:99px;overflow:hidden}
+.bar i{display:block;height:100%;background:var(--now-edge)}
+
+.sched{background:var(--paper);border:1px solid var(--rule);border-radius:12px;overflow:hidden}
+.row{display:grid;grid-template-columns:118px 1fr;gap:12px;padding:10px 14px;border-top:1px solid var(--rule);align-items:baseline}
+.row:first-child{border-top:0}
+.row .t{font-family:var(--f-mono);font-variant-numeric:tabular-nums;font-size:14px;white-space:nowrap}
+.row .what{min-width:0;display:flex;flex-direction:column}
+.row .cls{font-weight:700;overflow-wrap:anywhere}
+.row .mods{font-size:12px;letter-spacing:.06em;text-transform:uppercase;color:var(--muted)}
+.row.open .cls{font-weight:400;color:var(--muted)}
+.row.block{background:var(--act)}
+.row.block .cls{font-family:var(--f-display)}
+.row.cur{background:var(--now);box-shadow:inset 4px 0 0 var(--now-edge)}
+.row.past{opacity:.55}
+.listtools{display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap}
+label.tog{display:flex;gap:6px;align-items:center;font-size:14px}
+
+.panel{background:var(--paper);border:1px solid var(--rule);border-radius:12px;padding:16px;display:flex;flex-direction:column;gap:12px}
+.panel h3{font-size:18px}
+.seg{display:flex;gap:6px;flex-wrap:wrap}
+.seg button{width:44px;height:44px;border-radius:10px;border:1px solid var(--rule);background:var(--bg);font-family:var(--f-display);font-weight:800;font-size:20px}
+.seg button[aria-pressed="true"]{background:var(--accent);color:var(--accent-ink);border-color:var(--accent)}
+.classgrid{display:grid;grid-template-columns:auto 1fr;gap:6px 10px;align-items:center}
+.classgrid label{font-size:13px;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);white-space:nowrap}
+.classgrid input{width:100%}
+.btn{border:1px solid var(--accent);background:var(--accent);color:var(--accent-ink);font-weight:700;padding:9px 14px;border-radius:9px}
+.btn.ghost{background:transparent;color:var(--accent)}
+.rowflex{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+.rowflex > input{flex:1}
+.drop{border:2px dashed var(--rule);border-radius:12px;padding:18px;text-align:center}
+.drop.over{border-color:var(--accent)}
+ol.steps{margin:0;padding-left:20px;display:flex;flex-direction:column;gap:4px}
+table.days{width:100%;border-collapse:collapse;font-size:14px}
+table.days td,table.days th{padding:6px 8px;border-top:1px solid var(--rule);text-align:left;vertical-align:top}
+table.days th{font-size:12px;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);border-top:0}
+.tablewrap{overflow-x:auto}
+.status{font-size:14px;font-weight:700}
+.status.ok{color:var(--ok)} .status.err{color:var(--warn)}
+.save{font-size:13px;color:var(--muted);min-height:1.2em}
+@media (max-width:480px){.row{grid-template-columns:96px 1fr}.letter{width:68px;height:68px;font-size:50px}.dayinfo h2{font-size:22px}}
+@media (prefers-reduced-motion:reduce){*{transition:none!important}}
+</style>
+
+<div class="wrap">
+  <header class="top">
+    <div class="brand">Mod Day Planner</div>
+    <nav class="tabs" role="tablist">
+      <button role="tab" id="tab-today" aria-selected="true" data-view="today">Today</button>
+      <button role="tab" id="tab-classes" aria-selected="false" data-view="classes">My classes</button>
+      <button role="tab" id="tab-cal" aria-selected="false" data-view="cal">Calendar</button>
+    </nav>
+  </header>
+
+  <!-- TODAY -->
+  <section id="view-today" style="display:flex;flex-direction:column;gap:16px">
+    <div class="datebar">
+      <button class="iconbtn" id="prevDay" aria-label="Previous school day">‹</button>
+      <div class="lbl" id="dateLbl"></div>
+      <button class="iconbtn" id="nextDay" aria-label="Next school day">›</button>
+    </div>
+    <div style="text-align:center;margin-top:-10px"><button class="linkbtn" id="goToday">Jump to today</button></div>
+
+    <div class="dayhead">
+      <div class="letter" id="letterBox">–</div>
+      <div class="dayinfo">
+        <h2 id="schedName">Daily schedule</h2>
+        <span class="chip" id="srcChip"></span>
+        <div class="small muted" id="evtTitles"></div>
+      </div>
+    </div>
+
+    <details id="overrideBox">
+      <summary class="small" style="cursor:pointer;font-weight:700">Change letter day or schedule for this date</summary>
+      <div class="override" style="margin-top:10px">
+        <select id="ovLetter" aria-label="Letter day"></select>
+        <select id="ovSched" aria-label="Schedule"></select>
+        <button class="btn ghost" id="ovClear">Use calendar</button>
+      </div>
+    </details>
+
+    <div class="now" id="nowBox" hidden>
+      <div class="small" id="nowKicker" style="font-weight:700;letter-spacing:.06em;text-transform:uppercase"></div>
+      <div class="big" id="nowWhat"></div>
+      <div class="small mono" id="nowWhen"></div>
+      <div class="bar"><i id="nowBar" style="width:0"></i></div>
+    </div>
+
+    <div class="listtools">
+      <span class="small muted" id="dismissNote"></span>
+      <label class="tog"><input type="checkbox" id="everyMod"> Show every mod</label>
+    </div>
+    <div class="sched" id="schedList"></div>
+  </section>
+
+  <!-- CLASSES -->
+  <section id="view-classes" hidden style="flex-direction:column;gap:16px">
+    <div class="panel">
+      <h3>Classes by letter day</h3>
+      <p class="small muted" style="margin:0">Type a class in every mod it meets. Consecutive mods with the same name show as one block on the Today view. Leave a mod empty for open or prep time.</p>
+      <div class="seg" id="letterSeg"></div>
+      <div class="classgrid" id="classGrid"></div>
+      <div class="rowflex">
+        <select id="copyFrom" aria-label="Copy from letter day"></select>
+        <button class="btn ghost" id="copyBtn">Copy into this day</button>
+      </div>
+      <div class="save" id="saveNote"></div>
+    </div>
+  </section>
+
+  <!-- CALENDAR -->
+  <section id="view-cal" hidden style="flex-direction:column;gap:16px">
+    <div class="panel">
+      <h3>School calendar</h3>
+      <div class="status" id="autoStatus"></div>
+      <p class="small muted" style="margin:0">The calendar refreshes itself every morning from the school's Google Calendar. If something changed today and you can't wait, import the .ics file yourself below.</p>
+      <details>
+      <summary class="small" style="cursor:pointer;font-weight:700">Import a calendar file now</summary>
+      <div class="drop" id="drop" style="margin-top:10px">
+        <p style="margin:0 0 8px">Drop the .ics file here</p>
+        <input type="file" id="icsFile" accept=".ics,text/calendar">
+      </div>
+      <details>
+        <summary class="small" style="cursor:pointer">Or paste the calendar text</summary>
+        <textarea id="icsText" rows="5" style="width:100%;margin-top:8px" placeholder="BEGIN:VCALENDAR…"></textarea>
+        <button class="btn ghost" id="pasteBtn" style="margin-top:6px">Import pasted text</button>
+      </details>
+      </details>
+      <div class="status" id="importStatus"></div>
+    </div>
+
+    <div class="panel">
+      <h3>Move my classes to another device</h3>
+      <p class="small muted" style="margin:0">Your classes are saved on this device only. To put them on your phone or another computer, copy this code there and paste it in the same box.</p>
+      <div class="rowflex">
+        <button class="btn" id="exportBtn">Copy my code</button>
+        <button class="btn ghost" id="importCodeBtn">Load a code</button>
+      </div>
+      <textarea id="codeBox" rows="3" style="width:100%" placeholder="Your code appears here, or paste a code from another device"></textarea>
+      <div class="status" id="codeStatus"></div>
+    </div>
+
+    <div class="panel">
+      <h3>Upcoming school days</h3>
+      <p class="small muted" style="margin:0">The planner looks for titles like “B Day”, “Day B”, “Activity #4”, “Activity Schedule 7”, “Homeroom #2”. A letter day with no schedule named uses the daily schedule.</p>
+      <div class="tablewrap"><table class="days" id="daysTable"></table></div>
+    </div>
+  </section>
+</div>
+
+</head>
+<body>
+<script src="ics-parse.js"></script>
+<script>
+(function(){
+/* ---------- schedule data (from the printed schedule card) ---------- */
+const DISMISS = "3:00";
+const RAW = {
+  daily:{name:"Daily schedule", mods:"8:09 8:32 8:55 9:18 9:41 10:04 10:27 10:50 11:13 11:36 11:59 12:22 12:45 1:08 1:31 1:54 2:17 2:40"},
+  hr1:{name:"Homeroom #1", sub:"28 min", mods:"8:27 8:49 9:11 9:33 9:55 10:17 10:39 11:01 11:23 11:45 12:07 12:29 12:51 1:13 1:35 1:57 2:19 2:41", blocks:[["Homeroom","8:09",null]]},
+  hr2:{name:"Homeroom #2", sub:"33 min", mods:"8:09 8:30 8:51 9:12 9:33 9:54 10:15 10:36 10:57 11:18 11:39 12:00 12:21 12:42 1:03 1:24 1:45 2:06", blocks:[["Homeroom","2:27","3:00"]]},
+  a1:{name:"Activity #1", sub:"90 min activity", mods:"9:39 9:57 10:15 10:33 10:51 11:09 11:27 11:45 12:03 12:21 12:39 12:57 1:15 1:33 1:51 2:09 2:27 2:45", blocks:[["Activity","8:09","9:39"]]},
+  a2:{name:"Activity #2", sub:"72 min activity", mods:"9:21 9:40 9:59 10:18 10:37 10:56 11:15 11:34 11:53 12:12 12:31 12:50 1:09 1:28 1:47 2:06 2:25 2:44", blocks:[["Activity","8:09","9:21"]]},
+  a3:{name:"Activity #3", sub:"54 min activity", mods:"9:03 9:23 9:43 10:03 10:23 10:43 11:03 11:23 11:43 12:03 12:23 12:43 1:03 1:23 1:43 2:03 2:23 2:43", blocks:[["Activity","8:09","9:03"]]},
+  a4:{name:"Activity #4", sub:"90 min activity", mods:"8:09 8:27 8:45 9:03 9:21 9:39 11:27 11:45 12:03 12:21 12:39 12:57 1:15 1:33 1:51 2:09 2:27 2:45", blocks:[["Activity","9:54","11:24"]]},
+  a5:{name:"Activity #5", sub:"72 min activity", mods:"8:09 8:28 8:47 9:06 9:25 9:44 11:15 11:34 11:53 12:12 12:31 12:50 1:09 1:28 1:47 2:06 2:25 2:44", blocks:[["Activity","10:00","11:12"]]},
+  a6:{name:"Activity #6", sub:"54 min activity", mods:"8:09 8:29 8:49 9:09 9:29 9:49 11:03 11:23 11:43 12:03 12:23 12:43 1:03 1:23 1:43 2:03 2:23 2:43", blocks:[["Activity","10:06","11:00"]]},
+  a7:{name:"Activity #7", sub:"90 min activity", mods:"8:09 8:27 8:45 9:03 9:21 9:39 9:57 10:15 10:33 10:51 11:09 11:27 11:45 12:03 12:21 12:39 12:57 1:15", blocks:[["Activity","1:30","3:00"]]},
+  a8:{name:"Activity #8", sub:"72 min activity", mods:"8:09 8:28 8:47 9:06 9:25 9:44 10:03 10:22 10:41 11:00 11:19 11:38 11:57 12:16 12:35 12:54 1:13 1:32", blocks:[["Activity","1:48","3:00"]]},
+  a9:{name:"Activity #9", sub:"54 min activity", mods:"8:09 8:29 8:49 9:09 9:29 9:49 10:09 10:29 10:49 11:09 11:29 11:49 12:09 12:29 12:49 1:09 1:29 1:49", blocks:[["Activity","2:06","3:00"]]},
+  a10:{name:"Activity #10", sub:"first mod 9:54", mods:"9:54 10:11 10:28 10:45 11:02 11:19 11:36 11:53 12:10 12:27 12:44 1:01 1:18 1:35 1:52 2:09 2:26 2:43"}
+};
+const ORDER = ["daily","hr1","hr2","a1","a2","a3","a4","a5","a6","a7","a8","a9","a10"];
+const LETTERS = ["A","B","C","D","E","F"];
+
+function toMin(s){const [h,m]=s.split(":").map(Number);return ((h<7?h+12:h)*60)+m;}
+function fmt(min){let h=Math.floor(min/60),m=min%60;const ap=h>=12?"pm":"am";h=h%12||12;return h+":"+String(m).padStart(2,"0");}
+function fmtAp(min){let h=Math.floor(min/60);return fmt(min)+(h>=12?" pm":" am");}
+
+/* Each block ends 3 minutes before the next one starts; the last ends at dismissal.
+   Activity / homeroom blocks with a printed end keep that end. */
+function buildSchedule(key){
+  const r=RAW[key]; const out=[];
+  r.mods.split(" ").forEach((t,i)=>out.push({type:"mod",n:i+1,start:toMin(t)}));
+  (r.blocks||[]).forEach(b=>out.push({type:"block",label:b[0],start:toMin(b[1]),end:b[2]?toMin(b[2]):null}));
+  out.sort((a,b)=>a.start-b.start);
+  out.forEach((b,i)=>{
+    if(b.type==="mod"||b.end==null){const nx=out[i+1]; b.end=nx?nx.start-3:toMin(DISMISS);}
+  });
+  return out;
+}
+const SCHED={}; ORDER.forEach(k=>SCHED[k]=buildSchedule(k));
+
+/* ---------- state ---------- */
+let state={settings:{classes:{},overrides:{},everyMod:false},calendar:{days:{},importedAt:null,count:0}};
+LETTERS.forEach(L=>state.settings.classes[L]=Array(18).fill(""));
+let selDate=todayKey(); let editLetter="A";
+
+function todayKey(d){d=d||new Date();return d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0")+"-"+String(d.getDate()).padStart(2,"0");}
+function keyToDate(k){const [y,m,d]=k.split("-").map(Number);return new Date(y,m-1,d);}
+function shift(k,n){const d=keyToDate(k);d.setDate(d.getDate()+n);return todayKey(d);}
+
+/* ---------- storage: db (per-person, private) with local fallback ---------- */
+const LS="modplanner.v1.";
+function lsGet(k){try{return JSON.parse(localStorage.getItem(LS+k));}catch(e){return null;}}
+function lsSet(k,v){try{localStorage.setItem(LS+k,JSON.stringify(v));}catch(e){}}
+function persist(name){ lsSet(name,state[name]); }
+function merge(name,v){ if(!v) return; if(name==="settings"){state.settings=Object.assign(state.settings,v); LETTERS.forEach(L=>{const a=state.settings.classes[L]||[];state.settings.classes[L]=Array.from({length:18},(_,i)=>a[i]||"");});} else state.calendar=Object.assign(state.calendar,v); }
+merge("settings",lsGet("settings")); merge("calendar",lsGet("calendar"));
+
+/* ---------- calendar import (parser lives in ics-parse.js) ---------- */
+function importICS(text){
+  const r=ICSParse.buildDays(text);
+  state.calendar={days:r.days,importedAt:new Date().toISOString(),count:r.count,source:"file"};
+  persist("calendar");
+  return {events:r.events,count:r.count};
+}
+async function loadAutoCalendar(){
+  try{
+    const res=await fetch("calendar.json?ts="+Date.now(),{cache:"no-store"});
+    if(!res.ok) return;
+    const j=await res.json();
+    if(!j||!j.days||!j.updatedAt) return;
+    autoInfo=j;
+    const mine=state.calendar.importedAt||"";
+    if(state.calendar.source!=="file"||j.updatedAt>mine){
+      state.calendar={days:j.days,importedAt:j.updatedAt,count:Object.values(j.days).filter(d=>d.l).length,source:"auto"};
+      lsSet("calendar",state.calendar);
+    }
+    renderAll();
+  }catch(e){/* offline: keep the saved copy */}
+}
+let autoInfo=null;
+
+/* ---------- day resolution ---------- */
+function dayInfo(k){
+  const ov=state.settings.overrides[k]; const cal=state.calendar.days[k];
+  let letter=cal&&cal.l||null, sched=cal&&cal.s||null, src=cal?"cal":"none";
+  if(letter&&!sched) sched="daily";
+  if(ov){ if(ov.l) letter=ov.l; if(ov.s) sched=ov.s; src="man"; }
+  return {letter,sched:sched||"daily",src,titles:cal?cal.t:[],cal};
+}
+function isSchoolDay(k){const d=state.calendar.days[k];return (d&&d.l)||state.settings.overrides[k];}
+
+/* ---------- rendering ---------- */
+const $=id=>document.getElementById(id);
+function setSave(t){$("saveNote").textContent=t;}
+
+function blocksFor(info){
+  const sch=SCHED[info.sched]; const cls=info.letter?state.settings.classes[info.letter]:Array(18).fill("");
+  const every=state.settings.everyMod; const rows=[];
+  for(const b of sch){
+    if(b.type==="block"){rows.push({kind:"block",label:b.label,start:b.start,end:b.end});continue;}
+    const name=(cls[b.n-1]||"").trim(); const last=rows[rows.length-1];
+    if(!every&&last&&last.kind==="mod"&&last.name.toLowerCase()===name.toLowerCase()&&last.lastMod===b.n-1){last.end=b.end;last.lastMod=b.n;continue;}
+    rows.push({kind:"mod",name,firstMod:b.n,lastMod:b.n,start:b.start,end:b.end});
+  }
+  return rows;
+}
+function rowTitle(r){ return r.kind==="block"? r.label : (r.name||"Open"); }
+function rowMods(r){ return r.kind==="block"? (RAW[curInfo.sched].sub||"") : (r.firstMod===r.lastMod?"Mod "+r.firstMod:"Mods "+r.firstMod+"–"+r.lastMod); }
+
+let curInfo=null;
+function renderToday(){
+  const d=keyToDate(selDate); const isToday=selDate===todayKey();
+  $("dateLbl").textContent=(isToday?"Today · ":"")+d.toLocaleDateString(undefined,{weekday:"long",month:"long",day:"numeric"});
+  $("goToday").hidden=isToday;
+  const info=dayInfo(selDate); curInfo=info;
+  const lb=$("letterBox"); lb.textContent=info.letter||"?"; lb.classList.toggle("none",!info.letter);
+  const r=RAW[info.sched];
+  $("schedName").textContent=(info.letter?info.letter+" Day · ":"")+r.name;
+  const chip=$("srcChip");
+  chip.className="chip "+(info.src==="cal"?"src-cal":"src-man");
+  chip.textContent=info.src==="cal"?"From school calendar":info.src==="man"?"Set by you":(state.calendar.count?"Not on the calendar":"No calendar imported yet");
+  $("evtTitles").textContent=info.titles&&info.titles.length?"“"+info.titles.join("”, “")+"”":"";
+  $("ovLetter").value=info.letter||""; $("ovSched").value=info.sched;
+  $("ovClear").hidden=!state.settings.overrides[selDate];
+  $("everyMod").checked=!!state.settings.everyMod;
+
+  const rows=blocksFor(info); const list=$("schedList"); list.textContent="";
+  const now=new Date(); const nm=now.getHours()*60+now.getMinutes()+now.getSeconds()/60;
+  let curRow=null,nextRow=null;
+  rows.forEach(row=>{
+    const el=document.createElement("div");
+    el.className="row"+(row.kind==="block"?" block":"")+(row.kind==="mod"&&!row.name?" open":"");
+    if(isToday){
+      if(nm>=row.start&&nm<row.end){el.classList.add("cur");curRow=row;}
+      else if(nm>=row.end) el.classList.add("past");
+      else if(!nextRow) nextRow=row;
+    }
+    const t=document.createElement("div"); t.className="t"; t.textContent=fmt(row.start)+"–"+fmt(row.end);
+    const w=document.createElement("div"); w.className="what";
+    const c=document.createElement("span"); c.className="cls"; c.textContent=rowTitle(row);
+    const m=document.createElement("span"); m.className="mods"; m.textContent=rowMods(row);
+    w.append(c,m); el.append(t,w); list.append(el);
+  });
+  $("dismissNote").textContent="Dismissal "+fmtAp(toMin(DISMISS))+(info.letter?"":" · pick a letter day to see your classes");
+
+  const nb=$("nowBox");
+  if(isToday&&(curRow||nextRow)&&nm>=rows[0].start-60){
+    nb.hidden=false;
+    if(curRow){
+      $("nowKicker").textContent="Now";
+      $("nowWhat").textContent=rowTitle(curRow);
+      const left=Math.ceil(curRow.end-nm);
+      $("nowWhen").textContent=fmt(curRow.start)+"–"+fmt(curRow.end)+" · "+left+" min left"+(nextRow?" · next: "+rowTitle(nextRow)+" at "+fmt(nextRow.start):"");
+      $("nowBar").style.width=Math.min(100,(nm-curRow.start)/(curRow.end-curRow.start)*100)+"%";
+    }else{
+      $("nowKicker").textContent=nm<rows[0].start?"Up first":"Passing time";
+      $("nowWhat").textContent=rowTitle(nextRow);
+      $("nowWhen").textContent="Starts "+fmt(nextRow.start)+" · in "+Math.ceil(nextRow.start-nm)+" min";
+      $("nowBar").style.width="0";
+    }
+  } else nb.hidden=true;
+}
+
+function renderClasses(){
+  const seg=$("letterSeg"); seg.textContent="";
+  LETTERS.forEach(L=>{const b=document.createElement("button");b.textContent=L;b.setAttribute("aria-pressed",L===editLetter);b.setAttribute("aria-label",L+" day");b.onclick=()=>{editLetter=L;renderClasses();};seg.append(b);});
+  const g=$("classGrid"); g.textContent="";
+  const arr=state.settings.classes[editLetter];
+  for(let i=0;i<18;i++){
+    const lab=document.createElement("label"); lab.htmlFor="cls-"+i;
+    lab.textContent="Mod "+(i+1)+" · "+fmt(SCHED.daily.filter(b=>b.type==="mod")[i].start);
+    const inp=document.createElement("input"); inp.type="text"; inp.id="cls-"+i; inp.value=arr[i]; inp.placeholder=i===0?"e.g. AP Calculus BC":"";
+    inp.autocomplete="off"; inp.setAttribute("list","classNames");
+    inp.addEventListener("input",()=>{arr[i]=inp.value; queueSave();});
+    g.append(lab,inp);
+  }
+  let dl=document.getElementById("classNames"); if(!dl){dl=document.createElement("datalist");dl.id="classNames";document.body.append(dl);}
+  const names=new Set(); LETTERS.forEach(L=>state.settings.classes[L].forEach(x=>x.trim()&&names.add(x.trim())));
+  dl.textContent=""; names.forEach(n=>{const o=document.createElement("option");o.value=n;dl.append(o);});
+  const cf=$("copyFrom"); cf.textContent="";
+  LETTERS.filter(L=>L!==editLetter).forEach(L=>{const o=document.createElement("option");o.value=L;o.textContent="Copy from "+L+" day";cf.append(o);});
+}
+let saveT=null;
+function queueSave(){setSave("Saving…");clearTimeout(saveT);saveT=setTimeout(()=>{persist("settings");setSave("Saved on this device");},500);}
+
+function renderCal(){
+  const as=$("autoStatus"); const when=state.calendar.importedAt?new Date(state.calendar.importedAt).toLocaleString(undefined,{month:"short",day:"numeric",hour:"numeric",minute:"2-digit"}):null;
+  if(state.calendar.count){as.className="status ok";as.textContent=state.calendar.count+" letter days on file · "+(state.calendar.source==="file"?"imported by you ":"updated ")+when;}
+  else{as.className="status err";as.textContent="No calendar yet. Once the GitHub setup runs, letter days appear here automatically.";}
+  const t=$("daysTable"); t.textContent="";
+  const head=document.createElement("tr"); ["Date","Day","Schedule","Calendar title"].forEach(h=>{const th=document.createElement("th");th.textContent=h;head.append(th);}); t.append(head);
+  const keys=Object.keys(state.calendar.days).filter(k=>k>=todayKey()).sort().slice(0,15);
+  if(!keys.length){const tr=document.createElement("tr");const td=document.createElement("td");td.colSpan=4;td.className="muted";td.textContent="Letter days for the next two weeks appear here once the calendar loads.";tr.append(td);t.append(tr);return;}
+  keys.forEach(k=>{const i=dayInfo(k);const tr=document.createElement("tr");
+    [keyToDate(k).toLocaleDateString(undefined,{weekday:"short",month:"short",day:"numeric"}),i.letter||"–",RAW[i.sched].name,(i.titles||[]).join(" · ")].forEach((v,j)=>{const td=document.createElement("td");td.textContent=v;if(j===1)td.style.fontWeight="700";tr.append(td);});
+    tr.style.cursor="pointer"; tr.onclick=()=>{selDate=k;show("today");}; t.append(tr);});
+}
+
+function renderAll(){renderToday();renderClasses();renderCal();}
+
+function show(v){
+  ["today","classes","cal"].forEach(x=>{const s=$("view-"+x);s.hidden=x!==v;s.style.display=x===v?"flex":"none";});
+  document.querySelectorAll(".tabs button").forEach(b=>b.setAttribute("aria-selected",b.dataset.view===v));
+  if(v==="today")renderToday(); if(v==="cal")renderCal(); if(v==="classes")renderClasses();
+}
+
+/* ---------- wiring ---------- */
+document.querySelectorAll(".tabs button").forEach(b=>b.onclick=()=>show(b.dataset.view));
+function step(dir){
+  let k=selDate;
+  for(let i=0;i<21;i++){k=shift(k,dir);const wd=keyToDate(k).getDay();if(state.calendar.count?isSchoolDay(k):(wd!==0&&wd!==6)){selDate=k;renderToday();return;}}
+  selDate=shift(selDate,dir);renderToday();
+}
+$("prevDay").onclick=()=>step(-1); $("nextDay").onclick=()=>step(1);
+$("goToday").onclick=()=>{selDate=todayKey();renderToday();};
+const ol=$("ovLetter"); {const o=document.createElement("option");o.value="";o.textContent="No letter day";ol.append(o);} LETTERS.forEach(L=>{const o=document.createElement("option");o.value=L;o.textContent=L+" Day";ol.append(o);});
+const os=$("ovSched"); ORDER.forEach(k=>{const o=document.createElement("option");o.value=k;o.textContent=RAW[k].name+(RAW[k].sub?" ("+RAW[k].sub+")":"");os.append(o);});
+function setOverride(){state.settings.overrides[selDate]={l:ol.value||null,s:os.value};persist("settings");renderToday();}
+ol.onchange=setOverride; os.onchange=setOverride;
+$("ovClear").onclick=()=>{delete state.settings.overrides[selDate];persist("settings");renderToday();};
+$("everyMod").onchange=e=>{state.settings.everyMod=e.target.checked;persist("settings");renderToday();};
+$("copyBtn").onclick=()=>{const from=$("copyFrom").value;state.settings.classes[editLetter]=state.settings.classes[from].slice();persist("settings");renderClasses();setSave("Copied "+from+" day into "+editLetter+" day");};
+$("exportBtn").onclick=async()=>{
+  const code="MODDAY1:"+btoa(unescape(encodeURIComponent(JSON.stringify({classes:state.settings.classes,overrides:state.settings.overrides}))));
+  const box=$("codeBox"); box.value=code; const st=$("codeStatus");
+  try{await navigator.clipboard.writeText(code);st.className="status ok";st.textContent="Copied. Paste it into this box on your other device.";}
+  catch(e){box.select();st.className="status ok";st.textContent="Code selected below. Copy it, then paste it on your other device.";}
+};
+$("importCodeBtn").onclick=()=>{
+  const st=$("codeStatus"); const v=$("codeBox").value.trim();
+  try{
+    if(!v.startsWith("MODDAY1:")) throw 0;
+    const o=JSON.parse(decodeURIComponent(escape(atob(v.slice(8)))));
+    merge("settings",{classes:o.classes,overrides:o.overrides||{}}); persist("settings"); renderAll();
+    st.className="status ok"; st.textContent="Loaded your classes.";
+  }catch(e){st.className="status err";st.textContent="That code didn't work. Copy the whole code, starting with MODDAY1:.";}
+};
+function doImport(text){
+  const st=$("importStatus"); st.dataset.fresh="1";
+  try{const r=importICS(text);st.className="status ok";st.textContent="Imported "+r.count+" letter days from "+r.events+" calendar events.";renderCal();renderToday();}
+  catch(e){st.className="status err";st.textContent=e.message;}
+}
+function readFile(f){if(!f)return;const fr=new FileReader();fr.onload=()=>doImport(String(fr.result));fr.onerror=()=>{$("importStatus").className="status err";$("importStatus").textContent="That file couldn't be read. Try downloading it again.";};fr.readAsText(f);}
+$("icsFile").onchange=e=>readFile(e.target.files[0]);
+const drop=$("drop");
+drop.addEventListener("dragover",e=>{e.preventDefault();drop.classList.add("over");});
+drop.addEventListener("dragleave",()=>drop.classList.remove("over"));
+drop.addEventListener("drop",e=>{e.preventDefault();drop.classList.remove("over");readFile(e.dataTransfer.files[0]);});
+$("pasteBtn").onclick=()=>doImport($("icsText").value);
+
+renderAll(); show("today");
+setInterval(()=>{ if(!$("view-today").hidden) renderToday(); },15000);
+loadAutoCalendar();
+document.addEventListener("visibilitychange",()=>{if(!document.hidden){loadAutoCalendar();renderToday();}});
+if("serviceWorker" in navigator&&location.protocol==="https:"){navigator.serviceWorker.register("sw.js").catch(()=>{});}
+window.__test={SCHED,fmt};
+})();
+</script>
+
+</body>
+</html>
